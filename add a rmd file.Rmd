@@ -8,6 +8,8 @@ output: github_document
 ```{r setup, include=FALSE}
 library(tidyverse)
 library(purrr)
+library(modelr)
+library(mgcv)
 ```
 
 ##Problem 1
@@ -71,4 +73,124 @@ all_estimate %>%
          y = "Solving homicides odds ratio comparing non-white victims to white victims") 
 ```
 
-From the plot, we can see in most cities in the study, the estimate odds ratio of solving homicides comparing non-white victims to white victims is less than 1. It indicate that in most of the cities, homicides in which the victim is non-white are substantially less likely to be resolved that those in which the victim is white. 
+From the plot, we can see in most cities in the study, the estimate odds ratio of solving homicides comparing non-white victims to white victims is less than 1. It indicate that in most of the cities, homicides in which the victim is non-white are substantially less likely to be resolved that those in which the victim is white. There are also some cities in which CI of odds ratio including 1, and 3 of them have estimate odds ratio greater than 1. In these cities, homicides in which the victim is non-white are more likely to be resolved that those in which the victim is white.
+
+## Problem 2
+### Tidy the data
+```{r problem 2.1}
+birthweight_df = read_csv("./data/birthweight.csv") 
+
+birthweight_df = janitor::clean_names(birthweight_df) %>%
+  mutate(babysex = replace(babysex, babysex == 1, 'male'),
+            babysex = replace(babysex, babysex == 2, 'female'),
+            babysex = as_factor(babysex),
+            frace = replace(frace, frace == 1, 'White'),
+            frace = replace(frace, frace == 2, 'Black'),
+            frace = replace(frace, frace == 3, 'Asian'),
+            frace = replace(frace, frace == 4, 'Puerto Rican'),
+            frace = replace(frace, frace == 8, 'Other'),
+            frace = replace(frace, frace == 9, 'Unknown'),
+            frace = as_factor(frace),
+            malform = replace(malform, malform == 0, 'absent'),
+            malform = replace(malform, malform == 1, 'present'),
+            malform = as_factor(malform),
+            mrace = replace(mrace, mrace == 1, 'White'),
+            mrace = replace(mrace, mrace == 2, 'Black'),
+            mrace = replace(mrace, mrace == 3, 'Asian'),
+            mrace = replace(mrace, mrace == 4, 'Puerto Rican'),
+            mrace = replace(mrace, mrace == 8, 'Other'),
+            mrace = as_factor(mrace)) %>%
+  dplyr::select(bwt, everything())
+
+sum(is.na(birthweight_df))
+```
+
+There are no missing value in this dataset.
+
+### Propose a regression model
+
+Use backward elimination method to build a regression model, take out non-significant variables one at a time.
+
+```{r problem 2.3}
+mult.fit = lm( bwt ~ ., data = birthweight_df)
+summary (mult.fit)
+step1 = update(mult.fit, . ~ . -pnumsga)
+summary(step1)
+step2 = update(step1, . ~ . -pnumlbw)
+summary(step2)
+step3 = update(step2, . ~ . -wtgain)
+summary(step3)
+step4 = update(step3, . ~ . -malform)
+summary(step4)
+step5 = update(step4, . ~ . -ppbmi)
+summary(step5)
+step6 = update(step5, . ~ . -frace)
+summary(step6)
+step7 = update(step6, . ~ . -momage)
+summary(step7)
+step8 = update(step7, . ~ . -menarche)
+summary(step8)
+
+fit_model1 = lm(bwt ~ babysex + bhead + blength + delwt + fincome + gaweeks + mheight + mrace + parity + ppwt + smoken, data = birthweight_df)
+```
+backforward
+
+
+
+#mult.fit <- lm(bwt ~ ., data=)
+#step(mult.fit, direction='backward')
+
+#lm1 = lm( bwt ~ babysex + bhead + blength + delwt + fincome +    gaweeks + mheight + mrace + parity + ppwt + smoken, data = birthweight_df)
+#summary(lm1)
+
+leaps(x = birthweight_df[,2], y = birthweight_df[,1], nbest=2, method="Cp")
+
+
+# Printing the 2 best models of each size, using the adjusted R^2 criterion:
+leaps(x = birthweight_df[,2:18], y = surg[,1], nbest=2, method="adjr2")
+
+# Summary of models for each size (one model per size)
+b<-regsubsets(Lnsurvival ~ ., data=surg)
+   (rs<-summary(b))
+
+# Plots of Cp and Adj-R2 as functions of parameters
+par(mar=c(4,4,1,1))
+par(mfrow=c(1,2))
+
+plot(2:9, rs$cp, xlab="No of parameters", ylab="Cp Statistic")
+abline(0,1)
+
+plot(2:9, rs$adjr2, xlab="No of parameters", ylab="Adj R2")
+```{r}
+birthweight_df %>%
+  modelr::add_residuals(fit_model1) %>% 
+  modelr::add_predictions(fit_model1) %>% 
+  ggplot(aes(x = pred, y = resid)) + geom_point()
+
+```
+
+```{r}
+fit_model2 = lm(bwt ~ blength + gaweeks, data = birthweight_df)
+summary(fit_model2)
+
+fit_model3 = lm(bwt ~ bhead + blength + babysex + bhead*blength + bhead*babysex + blength*babysex + bhead*blength*babysex, data = birthweight_df)
+summary(fit_model3)
+
+cv_df = 
+  crossv_mc(birthweight_df, 100)%>%
+  mutate(train = map(train, as_tibble),
+         test = map(test, as_tibble)) %>%
+  mutate(fit_model1 = map(train, ~lm(bwt ~ babysex + bhead + blength + delwt + fincome + gaweeks + mheight + mrace + parity + ppwt + smoken, data = .x)),
+         fit_model2 = map(train, ~lm(bwt ~ blength + gaweeks,data = .x)),
+         fit_model3 = map(train, ~lm(bwt ~ bhead + blength + babysex + bhead*blength + bhead*babysex + blength*babysex + bhead*blength*babysex, data = .x))) %>% 
+  mutate(rmse_model1 = map2_dbl(fit_model1, test, ~rmse(model = .x, data = .y)),
+         rmse_model2 = map2_dbl(fit_model2, test, ~rmse(model = .x, data = .y)),
+         rmse_model3 = map2_dbl(fit_model3, test, ~rmse(model = .x, data = .y)))
+
+cv_df %>% 
+  dplyr::select(starts_with("rmse")) %>% 
+  gather(key = model, value = rmse) %>% 
+  mutate(model = str_replace(model, "rmse_", ""),
+         model = fct_inorder(model)) %>% 
+  ggplot(aes(x = model, y = rmse)) + geom_violin()
+         
