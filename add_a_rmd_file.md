@@ -58,3 +58,23 @@ knitr::kable(digits = 3)
 | victim\_racenon-white |          0.313|         0.441|            0.62|
 
 The result of linear model shows that the adjusted odds ratio of solved homicides in which the victim is non-white estimated to be 0.441 times the odds ratio of homicides in which the victim is white.
+
+``` r
+each_city = homi_df %>%
+  group_by(city_state) %>%
+  nest()
+
+odds_glm = function(df){
+  glm( homi_solved ~ victim_age + victim_sex + victim_race, data = df, family =     binomial())  %>%
+  broom::tidy() %>%
+  mutate(OR_estimate = exp(estimate), OR_conf_low =        exp(estimate-qnorm(.975)*std.error), OR_conf_high = exp(estimate+qnorm(.975)*std.error)) %>%
+  filter(term == "victim_racenon-white") %>%
+  select(term,OR_conf_low, OR_estimate, OR_conf_high)
+}
+
+all_estimate = 
+  mutate(each_city, or = map(data, odds_glm)) %>%
+  select(city_state, or) %>%
+  unnest() %>%
+  select(-term)
+```
