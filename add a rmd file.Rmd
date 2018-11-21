@@ -26,3 +26,14 @@ homi_df =
 ```{r problem 1.2}
 balti_model = homi_df %>%
   filter(city_state == "Baltimore, MD")
+
+glm( homi_solved ~ victim_age + victim_sex + victim_race, data = balti_model, family = binomial()) %>%
+broom::tidy() %>%
+mutate(OR_estimate = exp(estimate), OR_conf_low = exp(estimate-qnorm(.975)*std.error), OR_conf_high = exp(estimate+qnorm(.975)*std.error)) %>%
+filter(term == "victim_racenon-white") %>%
+select(term,OR_conf_low, OR_estimate, OR_conf_high) %>% 
+knitr::kable(digits = 3)
+```
+
+The result of linear model shows that the adjusted odds ratio of solved homicides in which the victim is non-white estimated to be 0.441 times the odds ratio of homicides in which the victim is white.
+
