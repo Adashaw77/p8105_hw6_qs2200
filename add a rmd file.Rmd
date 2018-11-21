@@ -38,7 +38,7 @@ knitr::kable(digits = 3)
 
 The result of linear model shows that the adjusted odds ratio of solved homicides in which the victim is non-white estimated to be 0.441 times the odds ratio of homicides in which the victim is white.
 
-```{r problem 1.3}
+```{r problem 1.3, fig.height = 7}
 
 each_city = homi_df %>%
   group_by(city_state) %>%
@@ -58,6 +58,15 @@ all_estimate =
   unnest() %>%
   select(-term)
 
-
+all_estimate %>%
+  mutate(city_state = fct_reorder(city_state, OR_estimate)) %>%
+  ggplot(aes(x = city_state,y = OR_estimate)) + 
+  geom_point() +
+  geom_errorbar(aes(ymin = OR_conf_low,ymax = OR_conf_high))+
+  coord_flip()+
+  theme_minimal()+
+  labs(title = "Estimate and 95% CI of solving homicides odds ratio for each city", 
+         x = "City and State", 
+         y = "Solving homicides odds ratio comparing non-white victims to white victims") 
 
 ```

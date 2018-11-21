@@ -77,4 +77,17 @@ all_estimate =
   select(city_state, or) %>%
   unnest() %>%
   select(-term)
+
+all_estimate %>%
+  mutate(city_state = fct_reorder(city_state, OR_estimate)) %>%
+  ggplot(aes(x = city_state,y = OR_estimate)) + 
+  geom_point() +
+  geom_errorbar(aes(ymin = OR_conf_low,ymax = OR_conf_high))+
+  coord_flip()+
+  theme_minimal()+
+  labs(title = "Estimate and 95% CI of solving homicides odds ratio for each city", 
+         x = "City and State", 
+         y = "Solving homicides odds ratio comparing non-white victims to white victims") 
 ```
+
+![](add_a_rmd_file_files/figure-markdown_github/problem%201.3-1.png)
