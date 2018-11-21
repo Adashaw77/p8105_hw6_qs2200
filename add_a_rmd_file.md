@@ -83,6 +83,7 @@ all_estimate %>%
   ggplot(aes(x = city_state,y = OR_estimate)) + 
   geom_point() +
   geom_errorbar(aes(ymin = OR_conf_low,ymax = OR_conf_high))+
+  geom_hline(yintercept = 1, alpha = 0.5, color = "red")+
   coord_flip()+
   theme_minimal()+
   labs(title = "Estimate and 95% CI of solving homicides odds ratio for each city", 
@@ -91,3 +92,5 @@ all_estimate %>%
 ```
 
 ![](add_a_rmd_file_files/figure-markdown_github/problem%201.3-1.png)
+
+From the plot, we can see in most cities in the study, the estimate odds ratio of solving homicides comparing non-white victims to white victims is less than 1. It indicate that in most of the cities, homicides in which the victim is non-white are substantially less likely to be resolved that those in which the victim is white.
