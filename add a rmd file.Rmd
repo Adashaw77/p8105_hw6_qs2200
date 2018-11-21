@@ -1,0 +1,28 @@
+---
+title: "P8105_hw6_qs2200"
+author: "Qi Shao"
+date: "11/20/2018"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+```
+
+##Problem 1
+
+Tidy the data.
+```{r problem 1.1}
+homi_df = read_csv("./data/homicide-data.csv") 
+homi_df = 
+  homi_df%>%
+  mutate(city_state = str_c(city, ", ", state)) %>%
+  janitor::clean_names() %>%
+  mutate(homi_solved= ifelse(disposition == "Closed by arrest", 1, 0)) %>%
+  filter(!(city_state %in%c("Dallas, TX", "Phoenix, AZ", "Kansas City, MO", "Tulsa, AL"))) %>%
+  mutate(victim_race = ifelse(victim_race == "White", "white", "non-white"), victim_age = as.integer(victim_age), victim_race = fct_relevel(victim_race, "white", "non-white")) 
+```
+
+```{r problem 1.2}
+balti_model = homi_df %>%
+  filter(city_state == "Baltimore, MD")
