@@ -10,6 +10,8 @@ library(tidyverse)
 library(purrr)
 library(modelr)
 library(mgcv)
+library("leaps")
+library(HH)
 ```
 
 ##Problem 1
@@ -30,11 +32,11 @@ homi_df =
 balti_model = homi_df %>%
   filter(city_state == "Baltimore, MD")
 
-glm( homi_solved ~ victim_age + victim_sex + victim_race, data = balti_model, family = binomial()) %>%
+glm(homi_solved ~ victim_age + victim_sex + victim_race, data = balti_model, family = binomial()) %>%
 broom::tidy() %>%
 mutate(OR_estimate = exp(estimate), OR_conf_low = exp(estimate-qnorm(.975)*std.error), OR_conf_high = exp(estimate+qnorm(.975)*std.error)) %>%
 filter(term == "victim_racenon-white") %>%
-select(term,OR_conf_low, OR_estimate, OR_conf_high) %>% 
+dplyr::select(term,OR_conf_low, OR_estimate, OR_conf_high) %>% 
 knitr::kable(digits = 3)
 ```
 
@@ -51,14 +53,14 @@ odds_glm = function(df){
   broom::tidy() %>%
   mutate(OR_estimate = exp(estimate), OR_conf_low =        exp(estimate-qnorm(.975)*std.error), OR_conf_high = exp(estimate+qnorm(.975)*std.error)) %>%
   filter(term == "victim_racenon-white") %>%
-  select(term,OR_conf_low, OR_estimate, OR_conf_high)
+  dplyr::select(term,OR_conf_low, OR_estimate, OR_conf_high)
 }
 
 all_estimate = 
   mutate(each_city, or = map(data, odds_glm)) %>%
-  select(city_state, or) %>%
+  dplyr::select(city_state, or) %>%
   unnest() %>%
-  select(-term)
+  dplyr::select(-term)
 
 all_estimate %>%
   mutate(city_state = fct_reorder(city_state, OR_estimate)) %>%
@@ -81,25 +83,10 @@ From the plot, we can see in most cities in the study, the estimate odds ratio o
 birthweight_df = read_csv("./data/birthweight.csv") 
 
 birthweight_df = janitor::clean_names(birthweight_df) %>%
-  mutate(babysex = replace(babysex, babysex == 1, 'male'),
-            babysex = replace(babysex, babysex == 2, 'female'),
-            babysex = as_factor(babysex),
-            frace = replace(frace, frace == 1, 'White'),
-            frace = replace(frace, frace == 2, 'Black'),
-            frace = replace(frace, frace == 3, 'Asian'),
-            frace = replace(frace, frace == 4, 'Puerto Rican'),
-            frace = replace(frace, frace == 8, 'Other'),
-            frace = replace(frace, frace == 9, 'Unknown'),
-            frace = as_factor(frace),
-            malform = replace(malform, malform == 0, 'absent'),
-            malform = replace(malform, malform == 1, 'present'),
-            malform = as_factor(malform),
-            mrace = replace(mrace, mrace == 1, 'White'),
-            mrace = replace(mrace, mrace == 2, 'Black'),
-            mrace = replace(mrace, mrace == 3, 'Asian'),
-            mrace = replace(mrace, mrace == 4, 'Puerto Rican'),
-            mrace = replace(mrace, mrace == 8, 'Other'),
-            mrace = as_factor(mrace)) %>%
+  dplyr::mutate(babysex = as.factor(as.character(babysex)), 
+                frace = as_factor(as.character(frace)),
+                mrace = as_factor(as.character(mrace)),
+                malform = as_factor(as.character(malform))) %>%
   dplyr::select(bwt, everything())
 
 sum(is.na(birthweight_df))
@@ -132,35 +119,23 @@ step8 = update(step7, . ~ . -menarche)
 summary(step8)
 
 fit_model1 = lm(bwt ~ babysex + bhead + blength + delwt + fincome + gaweeks + mheight + mrace + parity + ppwt + smoken, data = birthweight_df)
-```
-backforward
+summary(fit_model1)
 
 
+rs = regsubsets(bwt ~ babysex + bhead + blength + delwt + fincome + gaweeks + mheight + mrace + parity + ppwt + smoken, data = birthweight_df, max.size = 1)
+b = summary(rs)
 
-#mult.fit <- lm(bwt ~ ., data=)
-#step(mult.fit, direction='backward')
-
-#lm1 = lm( bwt ~ babysex + bhead + blength + delwt + fincome +    gaweeks + mheight + mrace + parity + ppwt + smoken, data = birthweight_df)
-#summary(lm1)
-
-leaps(x = birthweight_df[,2], y = birthweight_df[,1], nbest=2, method="Cp")
-
-
-# Printing the 2 best models of each size, using the adjusted R^2 criterion:
-leaps(x = birthweight_df[,2:18], y = surg[,1], nbest=2, method="adjr2")
-
-# Summary of models for each size (one model per size)
-b<-regsubsets(Lnsurvival ~ ., data=surg)
-   (rs<-summary(b))
-
-# Plots of Cp and Adj-R2 as functions of parameters
 par(mar=c(4,4,1,1))
 par(mfrow=c(1,2))
 
-plot(2:9, rs$cp, xlab="No of parameters", ylab="Cp Statistic")
+plot(2:9, b$cp, xlab="No of parameters", ylab="Cp Statistic")
 abline(0,1)
 
-plot(2:9, rs$adjr2, xlab="No of parameters", ylab="Adj R2")
+plot(2:9, b$adjr2, xlab="No of parameters", ylab="Adj R2")
+
+```
+
+
 ```{r}
 birthweight_df %>%
   modelr::add_residuals(fit_model1) %>% 
