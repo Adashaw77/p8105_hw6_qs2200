@@ -10,14 +10,12 @@ library(tidyverse)
 library(purrr)
 library(modelr)
 library(mgcv)
-library("leaps")
-library(HH)
 ```
 
 ##Problem 1
 
 Tidy the data.
-```{r problem 1.1}
+```{r problem 1.1, message= F}
 homi_df = read_csv("./data/homicide-data.csv") 
 homi_df = 
   homi_df%>%
@@ -80,7 +78,7 @@ From the plot, we can see in most cities in the study, the estimate odds ratio o
 ## Problem 2
 ### Tidy the data
 ```{r problem 2.1}
-birthweight_df = read_csv("./data/birthweight.csv") 
+birthweight_df = read.csv("./data/birthweight.csv") 
 
 birthweight_df = janitor::clean_names(birthweight_df) %>%
   dplyr::mutate(babysex = as.factor(as.character(babysex)), 
@@ -89,58 +87,59 @@ birthweight_df = janitor::clean_names(birthweight_df) %>%
                 malform = as_factor(as.character(malform))) %>%
   dplyr::select(bwt, everything())
 
-sum(is.na(birthweight_df))
+skimr::skim(birthweight_df) 
 ```
 
-There are no missing value in this dataset.
+There are 4342 observations and 10 variables in this dataset. 4 factor variables are babysex, father race, mother race and presence of malformations. There are no missing value in this dataset.
 
 ### Propose a regression model
 
-Use backward elimination method to build a regression model, take out non-significant variables one at a time.
+*Check the distribution of outcome*
 
-```{r problem 2.3}
-mult.fit = lm( bwt ~ ., data = birthweight_df)
-summary (mult.fit)
-step1 = update(mult.fit, . ~ . -pnumsga)
-summary(step1)
-step2 = update(step1, . ~ . -pnumlbw)
-summary(step2)
-step3 = update(step2, . ~ . -wtgain)
-summary(step3)
-step4 = update(step3, . ~ . -malform)
-summary(step4)
-step5 = update(step4, . ~ . -ppbmi)
-summary(step5)
-step6 = update(step5, . ~ . -frace)
-summary(step6)
-step7 = update(step6, . ~ . -momage)
-summary(step7)
-step8 = update(step7, . ~ . -menarche)
-summary(step8)
+```{r}
+birthweight_df %>%
+  ggplot(aes(x = bwt)) + 
+  geom_density() +
+  labs(title = "Distribution of birthweight variable")
+```
+We can see that the birth weight is approximately distributed normally, satisfying linear regression model assumption.
 
-fit_model1 = lm(bwt ~ babysex + bhead + blength + delwt + fincome + gaweeks + mheight + mrace + parity + ppwt + smoken, data = birthweight_df)
-summary(fit_model1)
+*Multicolinearity*
 
+```{r, eval = F}
+pairs(birthweight_df)
+```
+We could visualize the pairwise distribution of variables. And we can see the relationship between bwt and bhead/blength are in linear form.
 
-rs = regsubsets(bwt ~ babysex + bhead + blength + delwt + fincome + gaweeks + mheight + mrace + parity + ppwt + smoken, data = birthweight_df, max.size = 1)
-b = summary(rs)
+There are also some pair of predictors shows linear relationship: bhead and blength, delwt and ppbmi, delwt and ppwt, ppbmi and ppwt. We should concern the multicolinearity of these predictors.
 
-par(mar=c(4,4,1,1))
-par(mfrow=c(1,2))
-
-plot(2:9, b$cp, xlab="No of parameters", ylab="Cp Statistic")
-abline(0,1)
-
-plot(2:9, b$adjr2, xlab="No of parameters", ylab="Adj R2")
-
+*Use backward elimination method to build a regression model, take out non-significant variables one at a time.*
+```{r problem 2.3, results="hide"}
+mult.fit = lm(bwt ~ ., data = birthweight_df)
+step(mult.fit, direction='backward')
 ```
 
+```{r}
+fit_model1 = lm(bwt ~ babysex + bhead + blength + delwt + fincome + gaweeks + mheight + mrace + parity + ppwt + smoken, data = birthweight_df)
+summary(fit_model1)
+```
+The result of backward stepwise selection have 11 predictors.
+
+*Diagnose*
+```{r}
+par(mfrow = c(2,2))
+plot(fit_model1)
+```
+We can see the model fits well.
 
 ```{r}
 birthweight_df %>%
   modelr::add_residuals(fit_model1) %>% 
   modelr::add_predictions(fit_model1) %>% 
-  ggplot(aes(x = pred, y = resid)) + geom_point()
+  ggplot(aes(x = pred, y = resid)) + 
+  geom_point(alpha = .4)+
+  geom_hline(yintercept = 0, color = "red") +
+  ggtitle("Residuals vs Fitted value")
 
 ```
 
@@ -151,6 +150,7 @@ summary(fit_model2)
 fit_model3 = lm(bwt ~ bhead + blength + babysex + bhead*blength + bhead*babysex + blength*babysex + bhead*blength*babysex, data = birthweight_df)
 summary(fit_model3)
 
+set.seed(1)
 cv_df = 
   crossv_mc(birthweight_df, 100)%>%
   mutate(train = map(train, as_tibble),
